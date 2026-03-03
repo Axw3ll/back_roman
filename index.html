@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>IoT</title>
+    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+
+    <h2>Temperatura: <span id="temp">--</span></h2>
+    <h2>Humedad: <span id="hum">--</span></h2>
+    <h2>Botón: <span id="btn">--</span></h2>
+
+    <button onclick="encender()">Encender LED</button>
+    <button onclick="apagar()">Apagar LED</button>
+
+    <script>
+        const socket = io()
+
+        socket.on('sensorData', (data) => {
+            document.getElementById('temp').innerText = data.Temperature
+            document.getElementById('hum').innerText = data.Humidity
+            document.getElementById('btn').innerText = data.ButtonState
+        })
+
+        function encender() {
+            socket.emit('controlLED', 'on')
+        }
+
+        function apagar() {
+            socket.emit('controlLED', 'off')
+        }
+    </script>
+
+</body>
+
+</html>

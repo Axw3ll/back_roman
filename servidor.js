@@ -1,96 +1,88 @@
 const express = require('express')
+const http = require('http')
+const { Server } = require('socket.io')
 const { SerialPort } = require('serialport')
 const { ReadlineParser } = require('@serialport/parser-readline')
 
 const app = express()
+const server = http.createServer(app)
+const io = new Server(server)
+
 const PORT = 3000
 
-app.use(express.json())
-
+// 🔹 Últimos datos
 let sensorData = {
     Temperature: null,
     Humidity: null,
     ButtonState: null
 }
 
-
+// 🔹 Serial
 const serialPort = new SerialPort({
     path: 'COM4',
     baudRate: 9600
 })
 
-const parser = serialPort.pipe(new ReadlineParser({ delimiter: '\r\n' }))
+const parser = serialPort.pipe(
+    new ReadlineParser({ delimiter: '\r\n' })
+)
 
 serialPort.on('open', () => {
     console.log('✅ Puerto serial abierto')
 })
 
-
+// 🔥 Cuando llegan datos del ESP32
 parser.on('data', (data) => {
     try {
         const parsed = JSON.parse(data)
         sensorData = parsed
-        console.log('📥 Datos actualizados:', sensorData)
+
+        console.log('📥 Datos recibidos:', sensorData)
+
+        // 🚀 Emitir automáticamente a todos los clientes
+        io.emit('sensorData', sensorData)
+
     } catch (err) {
         console.log('⚠️ Error parseando JSON:', data)
     }
 })
 
 serialPort.on('error', (err) => {
-    console.error('❌ Error en puerto serial:', err.message)
+    console.error('❌ Error serial:', err.message)
 })
 
+/* ===========================
+   🔥 SOCKET.IO
+=========================== */
 
-// Obtener todo
-app.get('/api/sensors', (req, res) => {
-    res.json(sensorData)
-})
+io.on('connection', (socket) => {
+    console.log('🟢 Cliente conectado:', socket.id)
 
-// Obtener temperatura
-app.get('/api/temperature', (req, res) => {
-    res.json({ temperature: sensorData.Temperature })
-})
+    // Enviar últimos datos al conectarse
+    socket.emit('sensorData', sensorData)
 
-// Obtener humedad
-app.get('/api/humidity', (req, res) => {
-    res.json({ humidity: sensorData.Humidity })
-})
+    // 🔥 Escuchar evento desde el frontend para controlar LED
+    socket.on('controlLED', (state) => {
 
-// Obtener estado del botón
-app.get('/api/button', (req, res) => {
-    res.json({ button: sensorData.ButtonState })
-})
+        if (state !== 'on' && state !== 'off') return
 
-//LED
-app.post('/api/led', (req, res) => {
-    const { state } = req.body
+        const command = state + '\n'
 
-    if (state !== 'on' && state !== 'off') {
-        return res.status(400).json({
-            error: 'Estado inválido. Usa "on" o "off"'
+        serialPort.write(command, (err) => {
+            if (err) {
+                console.error('❌ Error enviando comando:', err.message)
+                return
+            }
+
+            console.log('📤 Comando enviado al ESP32:', state)
         })
-    }
+    })
 
-    const command = state === 'on' ? 'on\n' : 'off\n'
-
-    serialPort.write(command, (err) => {
-        if (err) {
-            console.error('❌ Error enviando comando:', err.message)
-            return res.status(500).json({
-                error: 'No se pudo enviar el comando'
-            })
-        }
-
-        console.log('📤 Comando enviado:', command.trim())
-
-        res.json({
-            message: `LED ${state}`,
-            command: command.trim()
-        })
+    socket.on('disconnect', () => {
+        console.log('🔴 Cliente desconectado:', socket.id)
     })
 })
 
-
-app.listen(PORT, () => {
-    console.log(`🚀 API corriendo en http://localhost:${PORT}`)
+server.listen(PORT, () => {
+    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`)
 })
