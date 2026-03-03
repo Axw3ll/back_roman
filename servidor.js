@@ -5,16 +5,15 @@ const { ReadlineParser } = require('@serialport/parser-readline')
 const app = express()
 const PORT = 3000
 
-app.use(express.json()) // 👈 necesario para leer JSON del body
+app.use(express.json())
 
-// 🔹 Variable global para guardar el último dato recibido
 let sensorData = {
     Temperature: null,
     Humidity: null,
     ButtonState: null
 }
 
-// 🔹 Configuración del puerto serial
+
 const serialPort = new SerialPort({
     path: 'COM4',
     baudRate: 9600
@@ -26,7 +25,7 @@ serialPort.on('open', () => {
     console.log('✅ Puerto serial abierto')
 })
 
-// 🔹 Cuando llegan datos del microcontrolador
+
 parser.on('data', (data) => {
     try {
         const parsed = JSON.parse(data)
@@ -37,14 +36,10 @@ parser.on('data', (data) => {
     }
 })
 
-// 🔹 Manejo de error serial
 serialPort.on('error', (err) => {
     console.error('❌ Error en puerto serial:', err.message)
 })
 
-/* ===========================
-   📡 ENDPOINTS
-=========================== */
 
 // Obtener todo
 app.get('/api/sensors', (req, res) => {
@@ -66,7 +61,7 @@ app.get('/api/button', (req, res) => {
     res.json({ button: sensorData.ButtonState })
 })
 
-// 🔥 NUEVO ENDPOINT → prender/apagar LED
+//LED
 app.post('/api/led', (req, res) => {
     const { state } = req.body
 
@@ -76,7 +71,6 @@ app.post('/api/led', (req, res) => {
         })
     }
 
-    // Comando que se enviará al ESP32
     const command = state === 'on' ? 'on\n' : 'off\n'
 
     serialPort.write(command, (err) => {
@@ -96,7 +90,7 @@ app.post('/api/led', (req, res) => {
     })
 })
 
-// 🔹 Iniciar servidor
+
 app.listen(PORT, () => {
     console.log(`🚀 API corriendo en http://localhost:${PORT}`)
 })
