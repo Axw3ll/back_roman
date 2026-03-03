@@ -77,7 +77,7 @@ app.post('/api/led', (req, res) => {
     }
 
     // Comando que se enviará al ESP32
-    const command = state === 'on' ? 'LED_ON\n' : 'LED_OFF\n'
+    const command = state === 'on' ? 'on\n' : 'off\n'
 
     serialPort.write(command, (err) => {
         if (err) {
